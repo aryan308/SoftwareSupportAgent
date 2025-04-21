@@ -29,16 +29,16 @@ This task extracts key components from the user’s support request, including e
 
 Expected Output:
 A structured JSON object with the following keys:
-**.** error_messages – Extracted error messages from the user query.
+**error_messages** – Extracted error messages from the user query.
 
 
-**.** system_info – Relevant system details (OS, environment variables, dependencies, etc.).
+**system_info** – Relevant system details (OS, environment variables, dependencies, etc.).
 
 
-**.** possible_causes – A list of probable root causes for the reported issue.
+**possible_causes** – A list of probable root causes for the reported issue.
 
 
-**.** troubleshooting_steps – Recommended steps to resolve the issue.
+**troubleshooting_steps** – Recommended steps to resolve the issue.
 
 
 Example Input:
@@ -102,11 +102,11 @@ Description:
  The agent now automatically retrieves recent support discussions from the Langflow GitHub Discussions tab. It processes the specified number of latest questions, analyzes them using the existing agent logic, and stores the answers locally.
  
 **Key Features:**
-**.** Automatically fetches a specified number of questions via GitHub GraphQL API
+1. Automatically fetches a specified number of questions via GitHub GraphQL API
 
-**.** Processes and answers each question
+2. Processes and answers each question
 
-**.** Saves results (question, answer, link, timestamp) in structured JSON files under an answers/ directory
+3. Saves results (question, answer, link, timestamp) in structured JSON files under an answers/ directory
 
 Example Output:
 json
