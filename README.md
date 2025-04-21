@@ -1,43 +1,44 @@
-Report on Current Capabilities of the Software Support Agent System
-Overview
+**Report on Current Capabilities of the Software Support Agent System**
+
+**Overview**
+
 The Software Support Agent System is designed to assist with troubleshooting and resolving issues related to the Langflow repository. It analyzes support queries, extracts relevant error logs and system details, and identifies related files from the codebase. The system is built using CrewAI, with Gemini API as the underlying LLM and litellm for handling completions.
-GitHub Code Fetching Methods:
-CrewAI’s Internal GitHub Tool – Uses OpenAI’s API but is not utilized due to its dependency on OpenAI-specific tools.
+
+**GitHub Code Fetching Methods:**
+
+**1. CrewAI’s Internal GitHub Tool** – Uses OpenAI’s API but is not utilized due to its dependency on OpenAI-specific tools.
 
 
-GitHub GraphQL API (New) – Now integrated to fetch support queries directly from Langflow's GitHub Discussions.
+**2. GitHub GraphQL API (New)** – Now integrated to fetch support queries directly from Langflow's GitHub Discussions.
 
 
 
-Current Capabilities
+**Current Capabilities**
 The system consists of one agent (SoftwareSupportAgent) and three primary tasks:
-Breaking Down the Support Query
-
-
-Identifying Relevant Files from the Codebase
-
-
-Automatically Fetching & Answering GitHub Discussions (New)
-
-
-
-
-
 1. Breaking Down the Support Query
+
+2. Identifying Relevant Files from the Codebase
+
+3. Automatically Fetching & Answering GitHub Discussions (New)
+
+
+
+**1. Breaking Down the Support Query**
 Description:
- This task extracts key components from the user’s support request, including error messages, system information, potential root causes, and troubleshooting steps.
+This task extracts key components from the user’s support request, including error messages, system information, potential root causes, and troubleshooting steps.
+
 Expected Output:
- A structured JSON object with the following keys:
-error_messages – Extracted error messages from the user query.
+A structured JSON object with the following keys:
+**.** error_messages – Extracted error messages from the user query.
 
 
-system_info – Relevant system details (OS, environment variables, dependencies, etc.).
+**.** system_info – Relevant system details (OS, environment variables, dependencies, etc.).
 
 
-possible_causes – A list of probable root causes for the reported issue.
+**.** possible_causes – A list of probable root causes for the reported issue.
 
 
-troubleshooting_steps – Recommended steps to resolve the issue.
+**.** troubleshooting_steps – Recommended steps to resolve the issue.
 
 
 Example Input:
@@ -45,6 +46,7 @@ I am getting the following error when running Langflow:
  "ModuleNotFoundError: No module named 'langchain'"
  I installed all dependencies using pip install -r requirements.txt, but the error persists.
  My system: Ubuntu 22.04, Python 3.10.
+ 
 Example Output:
 json
 CopyEdit
@@ -65,9 +67,10 @@ CopyEdit
 
 
 
-2. Identifying Relevant Files from the Codebase
+**2. Identifying Relevant Files from the Codebase** 
 Description:
- After breaking down the query, the system determines which code files are most relevant to each component of the issue (error messages, system information, possible causes, and troubleshooting steps).
+After breaking down the query, the system determines which code files are most relevant to each component of the issue (error messages, system information, possible causes, and troubleshooting steps).
+ 
 Expected Output:
  A JSON object mapping support components to relevant file paths.
 Example Input:
@@ -94,17 +97,17 @@ This output suggests that langflow/utils/dependencies.py likely handles missing 
 
 
 
-3. Automatically Fetching & Answering GitHub Discussions (New)
+**3. Automatically Fetching & Answering GitHub Discussions (New)**
 Description:
  The agent now automatically retrieves recent support discussions from the Langflow GitHub Discussions tab. It processes the specified number of latest questions, analyzes them using the existing agent logic, and stores the answers locally.
-Key Features:
-Automatically fetches a specified number of questions via GitHub GraphQL API
+ 
+**Key Features:**
+**.** Automatically fetches a specified number of questions via GitHub GraphQL API
 
+**.** Processes and answers each question
 
-Processes and answers each question
+**.** Saves results (question, answer, link, timestamp) in structured JSON files under an answers/ directory
 
-
-Saves results (question, answer, link, timestamp) in structured JSON files under an answers/ directory
 Example Output:
 json
 CopyEdit
@@ -117,10 +120,10 @@ CopyEdit
 
 This enables the system to autonomously monitor and assist with real-time issues raised in the Langflow community.
 
-Strengths of the Current System
+**Strengths of the Current System**
 ✅ Automated Troubleshooting – Breaks down queries into structured formats.
 ✅ Codebase Awareness – Maps errors to relevant files in Langflow’s repository.
-✅ Task Modularity – Ensures logical execution order (query breakdown → file        selection → analysis).
+✅ Task Modularity – Ensures logical execution order (query breakdown → file selection → analysis).
 ✅GitHub Integration (New) – Automatically fetches and responds to discussions.
 ✅ Answer Logging (New) – Saves all responses as timestamped JSON files for traceability.
 
