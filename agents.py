@@ -1,6 +1,8 @@
 import os
 import json
 import inspect
+import base64
+import requests
 from crewai_tools import GithubSearchTool
 from litellm import completion
 from crewai import Crew, Agent, Task, Process
@@ -8,12 +10,7 @@ from crewai.project import CrewBase, agent, crew, task
 from dotenv import load_dotenv
 load_dotenv()
 
-# Optionally, you can list available models with:
-# models = genai.list_models()
-# print(models)
-
-# Initialize the tool for semantic searches within a specific GitHub repository
-
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 @CrewBase
 class SoftwareSupport:
@@ -22,12 +19,50 @@ class SoftwareSupport:
     def __init__(self, prompt, repo):
         self.prompt = prompt
         self.repo = repo
+        self.github_token = os.getenv("GITHUB_TOKEN")
+        # Fetch metadata and README at initialization
+        self.repo_metadata = self._fetch_repo_metadata()
+        self.readme_content = self._fetch_readme_content()
+
+    def _parse_repo_url(self):
+        # Expecting URL of form https://github.com/owner/repo
+        parts = self.repo.rstrip('/').split('/')
+        return parts[-2], parts[-1]
+
+    def _fetch_repo_metadata(self):
+        owner, name = self._parse_repo_url()
+        url = f"https://api.github.com/repos/{owner}/{name}"
+        headers = {"Authorization": f"Bearer {self.github_token}"}
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _fetch_readme_content(self):
+        owner, name = self._parse_repo_url()
+        url = f"https://api.github.com/repos/{owner}/{name}/readme"
+        headers = {"Authorization": f"Bearer {self.github_token}",
+                   "Accept": "application/vnd.github.v3+json"}
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        content = base64.b64decode(data.get('content', '')).decode('utf-8', errors='ignore')
+        return content
 
     @agent
     def codebase_qna_agent(self) -> Agent:
         """
-        Create and configure an agent specialized in answering technical questions based on a given codebase.
+        Create and configure an agent specialized in answering technical questions based on a given codebase,
+        enriched with dynamic metadata and README context.
         """
+        # Build structured context
+        context_info = [
+            {"type": "repo_metadata", "value": f"Name: {self.repo_metadata.get('full_name')}, Description: {self.repo_metadata.get('description')}"},
+            {"type": "repo_stats", "value": f"Stars: {self.repo_metadata.get('stargazers_count')}, Forks: {self.repo_metadata.get('forks_count')}, Open issues: {self.repo_metadata.get('open_issues_count')}."},
+            {"type": "readme_excerpt", "value": self.readme_content[:1000]},  # first 1000 chars
+            {"type": "user_question", "value": f"{self.prompt}"},
+            {"type": "model_guidance", "value": "Provide clear technical explanations, code snippets, and debugging steps as needed."}
+        ]
+
         agent_obj = Agent(
             name="CodebaseQnAAgent",
             role="Software Codebase Expert",
@@ -47,74 +82,52 @@ class SoftwareSupport:
                 "errors, and explaining functionality in clear, actionable steps."
             ),
             tools=[GithubSearchTool(
-	github_repo='https://github.com/langflow-ai/langflow',
-	gh_token=os.environ["GH_TOKEN"],
-	content_types=['code', 'issue'] # Options: code, repo, pr, issue
-)],
-            llm="gemini/gemini-1.5-pro"  # Use a model optimized for in-depth technical understanding.
+                github_repo=self.repo,
+                gh_token=self.github_token,
+                content_types=['code', 'issue']
+            )],
+            llm="gemini/gemini-1.5-flash",
+            context=context_info
         )
         return agent_obj
 
-
     @task
     def analyze_codebase_question_task(self) -> Task:
-        """
-        Create a task for analyzing a codebase to answer technical and general questions.
-        The agent should extract key components, understand the architecture, and provide clear explanations.
-        """
         return Task(
             description=(
                 f"Analyze the given codebase and respond to the following question: {self.prompt}. "
                 "Identify the relevant parts of the code, extract key functions, classes, and dependencies, "
                 "and explain their role in the overall structure. If the question is technical, provide an in-depth explanation "
-                "with examples or refactored code if necessary. If the question is general, explain the use case, design choices, "
-                "and intended behavior in a clear and concise manner. "
-                "Ensure the response is structured with relevant code snippets, explanations, and suggestions if applicable."
+                "with examples or refactored code if necessary."
             ),
             expected_output=(
-                "A well-structured response containing:\n"
-                "- Key components of the codebase relevant to the question\n"
-                "- Detailed technical explanation (if applicable)\n"
-                "- Clear description of the use case and design choices (if applicable)\n"
-                "- Code snippets or refactored examples (if needed)\n"
-                "- Best practices, optimizations, or alternative approaches"
+                "A well-structured response containing key components, explanations, code snippets, and best practices."
             ),
             tools=[GithubSearchTool(
-	github_repo='https://github.com/langflow-ai/langflow',
-	gh_token=os.environ["GH_TOKEN"],
-	content_types=['code', 'issue'] # Options: code, repo, pr, issue
-)],
-            agent=self.codebase_qna_agent()  # Use the software support agent.
+                github_repo=self.repo,
+                gh_token=self.github_token,
+                content_types=['code', 'issue']
+            )],
+            agent=self.codebase_qna_agent()
         )
 
     @task
     def resolve_codebase_question_task(self) -> Task:
-        """
-        A task for resolving user queries related to a given codebase.
-        The agent will analyze the code, understand the context, and provide a clear, actionable solution.
-        """
         return Task(
             description=(
                 f"Thoroughly analyze the provided codebase to answer the following query: {self.prompt}. "
-                "Identify relevant functions, classes, and dependencies, and determine how they interact within the code. "
-                "If the query involves debugging, locate potential issues, explain the root cause, and provide a corrected version of the code. "
-                "If the query is about implementation or optimization, offer best practices and refactored solutions where necessary. "
-                "Ensure the response is well-structured, addressing the core question with precision and clarity."
+                "Locate potential issues, explain root causes, and provide fixes or optimizations as needed."
             ),
             expected_output=(
-                "A complete resolution to the query, including:\n"
-                "- A clear and concise answer to the user's question\n"
-                "- Relevant code snippets demonstrating the solution\n"
-                "- Explanation of the identified issue (if applicable)\n"
-                "- Suggested fixes, optimizations, or improvements\n"
-                "- Best practices and reasoning behind the solution\n"
-                "- Steps to verify and validate the solution in the codebase"
-            ),tools=[GithubSearchTool(
-	github_repo='https://github.com/langflow-ai/langflow',
-	gh_token=os.environ["GH_TOKEN"],
-	content_types=['code', 'issue'] # Options: code, repo, pr, issue
-)],context=[self.analyze_codebase_question_task()],
-            agent=self.codebase_qna_agent()  # Use the software support agent.
+                "A complete resolution with clear answers, code fixes, and validation steps."
+            ),
+            tools=[GithubSearchTool(
+                github_repo=self.repo,
+                gh_token=self.github_token,
+                content_types=['code', 'issue']
+            )],
+            context=[self.analyze_codebase_question_task()],
+            agent=self.codebase_qna_agent()
         )
 
     @crew
